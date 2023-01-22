@@ -3,6 +3,7 @@ const models = require('../models')
 const Order = models.Order
 const Product = models.Product
 const Restaurant = models.Restaurant
+const RestaurantCategory = models.RestaurantCategory
 const User = models.User
 const moment = require('moment')
 const { validationResult } = require('express-validator')
@@ -94,7 +95,33 @@ exports.indexRestaurant = async function (req, res) {
 // Orders have to include products that belongs to each order and restaurant details
 // sort them by createdAt date, desc.
 exports.indexCustomer = async function (req, res) {
-
+  try {
+    const orders = await Order.findAll(
+      {
+        attributes: ['id', 'startedAt', 'sentAt', 'deliveredAt', 'price', 'address', 'shippingCosts', 'restaurantId', 'userId', 'createdAt', 'updatedAt'],
+        where: { userId: req.user.id },
+        include: [
+          {
+            model: Restaurant,
+            as: 'restaurant',
+            attributes: ['id', 'name', 'description', 'address', 'postalCode', 'url', 'shippingCosts', 'averageServiceMinutes', 'email', 'phone', 'logo', 'heroImage', 'status', 'restaurantCategoryId'],
+            include: {
+              model: RestaurantCategory,
+              as: 'restaurantCategory'
+            }
+          },
+          {
+            model: Product,
+            as: 'products',
+            attributes: ['id', 'name', 'price', 'description', 'image', 'restaurantId', 'order', 'availability']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      })
+    res.json(orders)
+  } catch (err) {
+    res.status(500).send(err)
+  }
 }
 
 // TODO: Implement the create function that receives a new order and store it at the database.
@@ -105,7 +132,63 @@ exports.indexCustomer = async function (req, res) {
 // 4. In order to save the order and related products, start a transaction, store the order, store each product linea and commit the transaction
 // 5. If an exception is raised, catch it and rollback the transaction
 exports.create = async function (req, res) {
-
+  const err = validationResult(req)
+  if (err.errors.length > 0) {
+    res.status(422).send(err)
+  } else {
+    const t = await Order.sequelize.transaction()
+    try {
+      let newOrder = Order.build(req.body)
+      newOrder.userId = req.user.id
+      newOrder.startedAt = null
+      newOrder.sentAt = null
+      let cost = 0
+      for (let i = 0; i < req.body.products.length; i++) {
+        const product = await Product.findByPk(req.body.products[i].productId)
+        const unityPrice = product.price
+        const amount = req.body.products[i].quantity
+        const unitPrice = unityPrice * amount
+        cost = cost + unitPrice
+      }
+      if (cost > 10.0) {
+        newOrder.shippingCosts = 0.0
+        newOrder.price = cost
+      }
+      if (cost <= 10.0) {
+        const restaurant = await Restaurant.findByPk(req.body.restaurantId)
+        if (restaurant == null) {
+          res.statusz(404).send('No se ha encontrado el restaurante')
+        } else {
+          newOrder.shippingCosts = restaurant.shippingCosts
+          newOrder.price = cost + newOrder.shippingCosts
+        }
+      }
+      try {
+        newOrder = await newOrder.save()
+        newOrder.dataValues.products = []
+        for (let i = 0; i < req.body.products.length; i++) {
+          const product = await Product.findByPk(req.body.products[i].productId)
+          const unityPrice = product.price
+          const amount = req.body.products[i].quantity
+          newOrder.dataValues.products.push({
+            id: req.body.products[i].productId,
+            quantity: amount,
+            priceUnit: unityPrice
+          })
+        }
+        res.json(newOrder)
+        await t.commit()
+      } catch (err) {
+        if (err.name.includes('ValidationError')) {
+          res.status(422).send(err)
+        } else {
+          res.status(500).send(err)
+        }
+      }
+    } catch (err) {
+      await t.rollback()
+    }
+  }
 }
 
 exports.confirm = async function (req, res) {

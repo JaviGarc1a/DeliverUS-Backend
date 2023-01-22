@@ -1,0 +1,56 @@
+[
+  {
+    "_id": "3ab313eb-49bf-46c6-983b-db57b84b201f",
+    "name": "DeliverUS",
+    "default": true,
+    "sortNum": 10000,
+    "created": "2021-07-24T16:26:46.306Z",
+    "modified": "2022-04-07T11:23:01.083Z",
+    "data": [
+      {
+        "name": "base_url",
+        "value": "http://localhost:3000"
+      },
+      {
+        "name": "token",
+        "value": "6d2d3547b63c49adf12b24577844a4db8a85b6d3"
+      },
+      {
+        "name": "last_created_restaurant",
+        "value": "11"
+      },
+      {
+        "name": "last_created_order",
+        "value": "8"
+      },
+      {
+        "name": "last_created_product",
+        "value": "1404"
+      },
+      {
+        "name": "customerToken",
+        "value": "b4b6a11a25ee60cc2f2f1795b253c4f9bcdebaa3"
+      },
+      {
+        "name": "customerEmail",
+        "value": "Friesen.1e47666d3b50@outlook.com"
+      },
+      {
+        "name": "customerPassword",
+        "value": "secret"
+      },
+      {
+        "name": "orderAddress",
+        "value": "Mi dirección nº1"
+      },
+      {
+        "name": "customerId",
+        "value": "3"
+      },
+      {
+        "name": "ownerToken",
+        "value": "29c465cdc8671c208e8d8513ba1bcf1cd272cb09"
+      }
+    ]
+  }
+]
