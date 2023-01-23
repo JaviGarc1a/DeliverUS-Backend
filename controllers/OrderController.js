@@ -138,7 +138,7 @@ exports.create = async function (req, res) {
     return res.status(422).send(validationError)
   }
   try {
-    let newOrder = Order.build({ ...req.body, userId: req.user.id })
+    const newOrder = Order.build({ ...req.body, userId: req.user.id })
     let cost = 0
     for (const prod of req.body.products) {
       const product = await Product.findByPk(prod.productId)
@@ -159,20 +159,20 @@ exports.create = async function (req, res) {
         newOrder.price = cost + newOrder.shippingCosts
       }
     }
-    newOrder = await newOrder.save()
-    newOrder.dataValues.products = []
+    const savedOrder = await newOrder.save()
+    savedOrder.dataValues.products = []
     for (const prod of req.body.products) {
       const product = await Product.findByPk(prod.productId)
       const unityPrice = product.price
       const amount = prod.quantity
-      newOrder.dataValues.products.push({
+      savedOrder.dataValues.products.push({
         id: prod.productId,
         name: product.name,
         quantity: amount,
         priceUnit: unityPrice
       })
     }
-    res.json(newOrder)
+    res.json(savedOrder)
     await t.commit()
   } catch (err) {
     await t.rollback()
