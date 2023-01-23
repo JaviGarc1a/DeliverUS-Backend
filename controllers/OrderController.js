@@ -132,61 +132,54 @@ exports.indexCustomer = async function (req, res) {
 // 4. In order to save the order and related products, start a transaction, store the order, store each product linea and commit the transaction
 // 5. If an exception is raised, catch it and rollback the transaction
 exports.create = async function (req, res) {
-  const err = validationResult(req)
-  if (err.errors.length > 0) {
-    res.status(422).send(err)
-  } else {
-    const t = await Order.sequelize.transaction()
-    try {
-      let newOrder = Order.build(req.body)
-      newOrder.userId = req.user.id
-      newOrder.startedAt = null
-      newOrder.sentAt = null
-      let cost = 0
-      for (let i = 0; i < req.body.products.length; i++) {
-        const product = await Product.findByPk(req.body.products[i].productId)
-        const unityPrice = product.price
-        const amount = req.body.products[i].quantity
-        const unitPrice = unityPrice * amount
-        cost = cost + unitPrice
+  const validationError = validationResult(req)
+  const t = await Order.sequelize.transaction()
+  if (validationError.errors.length > 0) {
+    return res.status(422).send(validationError)
+  }
+  try {
+    let newOrder = Order.build({ ...req.body, userId: req.user.id })
+    let cost = 0
+    for (const prod of req.body.products) {
+      const product = await Product.findByPk(prod.productId)
+      const unityPrice = product.price
+      const amount = prod.quantity
+      const unitPrice = unityPrice * amount
+      cost = cost + unitPrice
+    }
+    if (cost > 10.0) {
+      newOrder.shippingCosts = 0.0
+      newOrder.price = cost
+    } else {
+      const restaurant = await Restaurant.findByPk(req.body.restaurantId)
+      if (restaurant == null) {
+        res.statusz(404).send('Not found restaurante')
+      } else {
+        newOrder.shippingCosts = restaurant.shippingCosts
+        newOrder.price = cost + newOrder.shippingCosts
       }
-      if (cost > 10.0) {
-        newOrder.shippingCosts = 0.0
-        newOrder.price = cost
-      }
-      if (cost <= 10.0) {
-        const restaurant = await Restaurant.findByPk(req.body.restaurantId)
-        if (restaurant == null) {
-          res.statusz(404).send('No se ha encontrado el restaurante')
-        } else {
-          newOrder.shippingCosts = restaurant.shippingCosts
-          newOrder.price = cost + newOrder.shippingCosts
-        }
-      }
-      try {
-        newOrder = await newOrder.save()
-        newOrder.dataValues.products = []
-        for (let i = 0; i < req.body.products.length; i++) {
-          const product = await Product.findByPk(req.body.products[i].productId)
-          const unityPrice = product.price
-          const amount = req.body.products[i].quantity
-          newOrder.dataValues.products.push({
-            id: req.body.products[i].productId,
-            quantity: amount,
-            priceUnit: unityPrice
-          })
-        }
-        res.json(newOrder)
-        await t.commit()
-      } catch (err) {
-        if (err.name.includes('ValidationError')) {
-          res.status(422).send(err)
-        } else {
-          res.status(500).send(err)
-        }
-      }
-    } catch (err) {
-      await t.rollback()
+    }
+    newOrder = await newOrder.save()
+    newOrder.dataValues.products = []
+    for (const prod of req.body.products) {
+      const product = await Product.findByPk(prod.productId)
+      const unityPrice = product.price
+      const amount = prod.quantity
+      newOrder.dataValues.products.push({
+        id: prod.productId,
+        name: product.name,
+        quantity: amount,
+        priceUnit: unityPrice
+      })
+    }
+    res.json(newOrder)
+    await t.commit()
+  } catch (err) {
+    await t.rollback()
+    if (err.name.includes('ValidationError')) {
+      res.status(422).send(err)
+    } else {
+      res.status(500).send(err)
     }
   }
 }
